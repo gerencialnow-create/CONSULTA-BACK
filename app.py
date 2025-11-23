@@ -30,34 +30,34 @@ def login():
     data = request.get_json(silent=True) or {}
 
     username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
+    password = (data.get("password") or "").strip()
 
     if not username or not password:
-        return jsonify({"ok": False, "error": "Usuário e senha são obrigatórios."}), 400
+        return jsonify({"success": False, "error": "missing_fields"}), 400
 
     users = load_users()
-    if not users:
-        return jsonify({"ok": False, "error": "Nenhum usuário configurado."}), 500
 
-    # Procura usuário pelo username
-    user = next((u for u in users if u.get("username") == username), None)
+    for user in users:
+        if (
+            user.get("username") == username
+            and user.get("password") == password
+            and user.get("active", True)
+        ):
+            return jsonify({
+                "success": True,
+                "username": username,
+                "role": user.get("role", "user")
+            }), 200
 
-    # Usuário não existe ou está inativo
-    if not user or not user.get("active", True):
-        return jsonify({"ok": False, "error": "Usuário ou senha inválidos."}), 401
+    # Usuário ou senha inválidos
+    return jsonify({"success": False, "error": "invalid_credentials"}), 401
 
-    # Compara senha simples (texto puro)
-    if user.get("password") != password:
-        return jsonify({"ok": False, "error": "Usuário ou senha inválidos."}), 401
 
-    # Login OK
-    return jsonify({
-        "ok": True,
-        "username": user.get("username"),
-        "role": user.get("role", "user")
-    }), 200
+@app.get("/api/health")
+def health():
+    return jsonify({"status": "ok"}), 200
 
 
 if __name__ == "__main__":
-    # Escuta em todas as interfaces, porta 5050
+    # Porta padrão que estamos usando para a API
     app.run(host="0.0.0.0", port=5050)
