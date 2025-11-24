@@ -1,0 +1,17 @@
+[Unit]
+Description=Consulta CPF Backend (Flask)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/CONSULTA-BACK
+Environment="PATH=/opt/CONSULTA-BACK/venv/bin"
+ExecStart=/opt/CONSULTA-BACK/venv/bin/python app.py
+Restart=always
+RestartSec=5
+User=root
+Group=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
