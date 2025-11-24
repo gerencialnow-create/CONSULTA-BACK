@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
 import json
+import subprocess
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -77,6 +78,7 @@ def login():
 def facta_upload():
     """
     Rota usada pelo dashboard.js para enviar arquivo da automação da FACTA.
+    Salva o arquivo e dispara o script automation/facta_clt_off.py em segundo plano.
     """
 
     if "file" not in request.files:
@@ -104,16 +106,22 @@ def facta_upload():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Falha ao salvar arquivo: {e}"}), 500
 
-    # FUTURO: aqui vamos acionar o facta_clt_off.py
-    # exemplo:
-    # subprocess.Popen(["python3", "automation/facta_clt_off.py", str(save_path)])
+    # Dispara a automação FACTA em background
+    try:
+        subprocess.Popen(
+            ["python3", "automation/facta_clt_off.py", str(save_path)],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Arquivo salvo, mas falha ao iniciar automação: {e}"}), 500
 
     return jsonify({
         "ok": True,
-        "message": "Arquivo recebido com sucesso.",
+        "message": "Arquivo recebido e consulta FACTA iniciada.",
         "saved_as": final_name
     }), 200
-
 
 # ============================================================
 # HEALTH CHECK
