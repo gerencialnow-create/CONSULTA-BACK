@@ -5,6 +5,8 @@ import json
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
+# Versão via GitHub - teste de deploy
+
 app = Flask(__name__)
 
 # Libera CORS para as rotas /api/*
