@@ -78,7 +78,7 @@ def login():
 def facta_upload():
     """
     Rota usada pelo dashboard.js para enviar arquivo da automação da FACTA.
-    Salva o arquivo e dispara o script automation/facta_clt_off.py em segundo plano.
+    (Por enquanto só salva o arquivo; depois ligamos na automação.)
     """
 
     if "file" not in request.files:
@@ -106,20 +106,12 @@ def facta_upload():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Falha ao salvar arquivo: {e}"}), 500
 
-    # Dispara a automação FACTA em background
-    try:
-        subprocess.Popen(
-            ["python3", "automation/facta_clt_off.py", str(save_path)],
-            cwd=str(BASE_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Arquivo salvo, mas falha ao iniciar automação: {e}"}), 500
+    # ⚠️ A automação FACTA ainda não está plugada aqui.
+    # Vamos ligar depois com um worker próprio.
 
     return jsonify({
         "ok": True,
-        "message": "Arquivo recebido e consulta FACTA iniciada.",
+        "message": "Arquivo recebido com sucesso. (Automação será ligada depois.)",
         "saved_as": final_name
     }), 200
 
