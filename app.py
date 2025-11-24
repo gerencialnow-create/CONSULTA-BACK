@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
 import json
-import subprocess
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -20,9 +19,12 @@ USERS_FILE = BASE_DIR / "config" / "users.json"
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+# Arquivo de status das higienizações FACTA
+STATUS_FILE = BASE_DIR / "status_facta.json"
+
 
 # ============================================================
-# CARREGAR USUÁRIOS
+# FUNÇÕES AUXILIARES
 # ============================================================
 
 def load_users():
@@ -36,6 +38,34 @@ def load_users():
     except Exception as e:
         print(f"[ERRO] Falha ao carregar users.json: {e}")
         return []
+
+
+def load_status_list():
+    """Carrega lista de higienizações (jobs) do arquivo de status."""
+    if not STATUS_FILE.exists():
+        return []
+
+    try:
+        with open(STATUS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict):
+                # compatibilidade se um dia salvou como dict
+                return [data]
+            return []
+    except Exception as e:
+        print(f"[WARN] Não consegui ler {STATUS_FILE}: {e}")
+        return []
+
+
+def save_status_list(jobs):
+    """Salva lista de higienizações (jobs) no arquivo de status."""
+    try:
+        with open(STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(jobs, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[WARN] Não consegui salvar {STATUS_FILE}: {e}")
 
 
 # ============================================================
@@ -70,15 +100,15 @@ def login():
 
 
 # ============================================================
-# NOVA ROTA CORRETA PARA O FRONT:
-# /api/facta/upload
+# UPLOAD FACTA + REGISTRO NA LISTA DE STATUS
 # ============================================================
 
 @app.post("/api/facta/upload")
 def facta_upload():
     """
     Rota usada pelo dashboard.js para enviar arquivo da automação da FACTA.
-    (Por enquanto só salva o arquivo; depois ligamos na automação.)
+    Salva o arquivo e registra a higienização no arquivo de status.
+    (Automação real será ligada depois.)
     """
 
     if "file" not in request.files:
@@ -106,14 +136,53 @@ def facta_upload():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Falha ao salvar arquivo: {e}"}), 500
 
-    # ⚠️ A automação FACTA ainda não está plugada aqui.
-    # Vamos ligar depois com um worker próprio.
+    # Cria um "job" de higienização
+    jobs = load_status_list()
+
+    job_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+    job = {
+        "id": job_id,
+        "file": final_name,
+        "bank": "CLT OFF • Facta",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "status": "PENDENTE",         # depois vamos evoluir para EM ANDAMENTO / CONCLUÍDO
+        "progress": 0,                # 0–100
+        "processed": 0,
+        "total": None,
+        "can_download": False,
+        "download_url": None,
+        "error": None,
+    }
+
+    # mais novo primeiro
+    jobs.insert(0, job)
+    save_status_list(jobs)
 
     return jsonify({
         "ok": True,
-        "message": "Arquivo recebido com sucesso. (Automação será ligada depois.)",
-        "saved_as": final_name
+        "message": "Arquivo enviado com sucesso! A higienização foi registrada.",
+        "saved_as": final_name,
+        "job_id": job_id,
     }), 200
+
+
+# ============================================================
+# LISTAGEM DE STATUS DAS HIGIENIZAÇÕES
+# ============================================================
+
+@app.get("/api/status")
+def list_status():
+    """
+    Retorna a lista de higienizações registradas (todas as automações).
+    Por enquanto só FACTA, depois podemos incluir V8, Presença, etc.
+    """
+    jobs = load_status_list()
+    return jsonify({
+        "ok": True,
+        "jobs": jobs,
+    }), 200
+
 
 # ============================================================
 # HEALTH CHECK
